@@ -116,6 +116,10 @@ def main(session):
             # next vm
             continue
 
+        # check for custom field "retain"
+        if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
+            vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
+
         vm_backup_dir = os.path.join(config['backup_dir'], vm_name) 
         # cleanup any old unsuccessful backups and create new full_backup_dir
         full_backup_dir = process_backup_dir(vm_backup_dir)
@@ -264,7 +268,7 @@ def main(session):
 
 
     ######################################################################
-    # Iterate through all vm-export= in cfg
+    # Iterate through VMs
     log('************ vm-export= ***************')
     for vm_parm in config['vm-export']:
         log('*** vm-export begin %s' % vm_parm)
@@ -289,6 +293,10 @@ def main(session):
             error_cnt += 1
             # next vm
             continue
+
+        # check for custom field "retain"
+        if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
+            vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
 
         vm_backup_dir = os.path.join(config['backup_dir'], vm_name)
         # cleanup any old unsuccessful backups and create new full_backup_dir
@@ -1188,7 +1196,8 @@ def log(mes, log_w_timestamp=True):
 
 def usage():
     print 'Usage-basic:'
-    print sys.argv[0], ' <config-file|vm-name> [compress=True|False] [allow_extra_keys=True|False]'
+    print sys.argv[0], ' <config-file|vm-name> [compress=True|False] [ignore_extra_keys=True|False] \
+                       [backup_running_vms=True|False]'
     print
     print 'see also: VmBackup.py help    - for additional parameter usage'
     print '      or: VmBackup.py config  - for config-file parameter usage'
@@ -1313,6 +1322,7 @@ if __name__ == '__main__':
     preview = False                 # default
     compress = False                # default
     ignore_extra_keys = False       # default
+    backup_running_vms = False      # default
 
     # loop through remaining optional args
     arg_range = range(2,len(sys.argv))
@@ -1324,6 +1334,8 @@ if __name__ == '__main__':
             compress = (array[1].lower() == 'true')
         elif array[0].lower() == 'ignore_extra_keys':
             ignore_extra_keys = (array[1].lower() == 'true')
+        elif array[0].lower() == 'backup_running_vms':
+            backup_running_vms = (array[1].lower() == 'true')
         else:
             print 'ERROR invalid parm: %s' % sys.argv[arg_ix]
             usage()
@@ -1400,6 +1412,19 @@ if __name__ == '__main__':
         else:
             print 'ERROR - XenAPI authentication error'
             sys.exit(1)
+
+    if backup_running_vms:
+             # get running VMs directly from XenServer
+             vms = session.xenapi.VM.get_all()
+
+             if (len(vms) == 0):
+                 print 'ERROR - no runnings VMs found'
+                 sys.exit(1)
+
+             for vm in vms:
+                 record = session.xenapi.VM.get_record(vm)
+                 if not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
+                     config['vm-export'].append(record['name_label'])
 
     config_print()     # show fully loaded config
 
