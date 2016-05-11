@@ -1239,13 +1239,13 @@ def remove_excludes():
 
 def config_load_defaults():
     # init config param not already loaded then load with default values
-    if not 'pool_db_backup' in config.keys():
+    if 'pool_db_backup' not in config.keys():
         config['pool_db_backup'] = str(DEFAULT_POOL_DB_BACKUP)
-    if not 'max_backups' in config.keys():
+    if 'max_backups' not in config.keys():
         config['max_backups'] = str(DEFAULT_MAX_BACKUPS)
-    if not 'vdi_export_format' in config.keys():
+    if 'vdi_export_format' not in config.keys():
         config['vdi_export_format'] = str(DEFAULT_VDI_EXPORT_FORMAT)
-    if not 'backup_dir' in config.keys():
+    if 'backup_dir' not in config.keys():
         config['backup_dir'] = str(DEFAULT_BACKUP_DIR)
 
 
@@ -1493,17 +1493,17 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # init vm-export/vdi-export/exclude in config list
-    if not 'vm-export' in config:
+    if 'vm-export' not in config:
         config['vm-export'] = []
-    if not 'vdi-export' in config:
+    if 'vdi-export' not in config:
         config['vdi-export'] = []
-    if not 'exclude' in config:
+    if 'exclude' not in config:
         config['exclude'] = []
 
     # init vm-export/vdi-export in wildcards list
-    if not 'vm-export' in wildcards:
+    if 'vm-export' not in wildcards:
         wildcards['vm-export'] = []
-    if not 'vdi-export' in wildcards:
+    if 'vdi-export' not in wildcards:
         wildcards['vdi-export'] = []
 
     # process config file
