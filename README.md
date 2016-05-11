@@ -169,8 +169,10 @@ These new features have been added:
 	exclude=PROD-WinDomainController
 	exclude=DEV-DestructiveTest
 
-	# password to connect to the XenAPI (required)
+	# password to connect to the XenAPI (required), Either via
 	password=sup3rs3cr37
+	# or
+	password_from_file=/root/server01.pwd
 
 	# location of the logfile (default `/var/log/NAUbackup.log`)
 	status_log=/path/to/file.log
