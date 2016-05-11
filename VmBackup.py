@@ -18,6 +18,7 @@
 # Title: NAUbackup / VmBackup - a XenServer vm-export and vdi-export Backup Script
 # Package Contents: README.md, VmBackup.py (this file), example.cfg
 # Version History
+# - v3.1 2016/05/11 Added the option to re-use retain values for the snapback-script
 # - v3.0 2016/01/20 Added vdi-export for VMs with too many/large disks for vm-export
 # - v2.1 2014/08/22 Added email status option
 # - v2.0 2014/04/09 New VmBackup version (supersedes all previous NAUbackup versions)
