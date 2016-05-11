@@ -63,7 +63,7 @@ MAIL_SMTP_SERVER = 'your-mail-server'
 
 config = {}
 wildcards = {}
-expected_keys = ['pool_db_backup', 'max_backups', 'backup_dir', 'vdi_export_format', 'vm-export', 'vdi-export', 'exclude', 'status_log', 'password']
+expected_keys = ['pool_db_backup', 'max_backups', 'backup_dir', 'vdi_export_format', 'vm-export', 'vdi-export', 'exclude', 'status_log', 'password', 'pool_host']
 message = ''
 xe_path = '/opt/xensource/bin' 
 
@@ -1112,6 +1112,8 @@ def config_load_defaults():
         config['backup_dir'] = str(DEFAULT_BACKUP_DIR)
     if not 'status_log' in config.keys():
         config['status_log'] = str(DEFAULT_STATUS_LOG)
+    if not 'pool_host' in config.keys():
+        config['pool_host'] = False
 
 def config_print():
     log('VmBackup.py running with these settings:')
@@ -1121,7 +1123,8 @@ def config_print():
     log('  vdi_export_format = %s' % config['vdi_export_format'])
     log('  pool_db_backup    = %s' % config['pool_db_backup'])
     log('  status_log     = %s' % config['status_log'])
-
+    if config['pool_host']:
+        log('  pool_host      = %s' % config['pool_host'])
     log('  exclude (cnt)= %s' % len(config['exclude']))
     str = ''
     for vm_parm in config['exclude']:
@@ -1414,17 +1417,33 @@ if __name__ == '__main__':
             sys.exit(1)
 
     if backup_running_vms:
-             # get running VMs directly from XenServer
-             vms = session.xenapi.VM.get_all()
+        if config['pool_host']:
+        vms = session.xenapi.VM.get_all()		 +            # get running VMs for given host in XenPool
+            host = session.xenapi.host.get_by_name_label(config['pool_host'])
 
-             if (len(vms) == 0):
-                 print 'ERROR - no runnings VMs found'
-                 sys.exit(1)
+            if len(host) > 1:
+                print 'ERROR - more than one host with name %s' % config['pool_host']
+                sys.exit(1)
 
-             for vm in vms:
-                 record = session.xenapi.VM.get_record(vm)
-                 if not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
-                     config['vm-export'].append(record['name_label'])
+            if len(host) < 1:
+                print 'ERROR - no host with name %s' % config['pool_host']
+                sys.exit(1)
+
+            host_record = session.xenapi.host.get_record(host[0])
+            vms = host_record['resident_VMs']
+        else:
+            # get running VMs directly from current XenServer
+            vms = session.xenapi.VM.get_all()
+
+
+        if (len(vms) == 0):
+             print 'ERROR - no runnings VMs found'
+             sys.exit(1)
+
+        for vm in vms:
+             record = session.xenapi.VM.get_record(vm)
+             if not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
+                 config['vm-export'].append(record['name_label'])
 
     config_print()     # show fully loaded config
 
