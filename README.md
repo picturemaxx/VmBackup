@@ -18,6 +18,7 @@ Copyright (C) 2016  Northern Arizona University
 **Package Contents:** README.md (this file), VmBackup.py, example.cfg
 
 ## Version History:
+ - v3.1 2016/05/11 Added the option to re-use retain values for the snapback-script
  - v3.0 2016/03/04 Added vdi-export and VM prefix wildcards.
  - v2.1 2014/08/22 Added email status option.
  - v2.0 2014/04/09 New VmBackup version supersedes all previous NAU Backup releases.
@@ -71,8 +72,8 @@ These new features have been added:
  - Find text OPTIONAL - if you want an automatic email to be sent at end of VmBackup then follow the instructions for the label MAIL_ENABLE. 
 6. Install the XenServer Software Development Kit from www.citrix.com/downloads - download the XenServer and copy file XenAPI.py into the same directory where VmBackup.py exists.
    - To verfy XenApi, execute VmBackup with a valid password and some simple vm-name.
-   - Example: ./VmBackup.py password vm-name preview 
-   - Note: if password has any special characters, then escape with back slash: ./VmBackup.py pass\$word vm-name
+   - Example: ./VmBackup.py vm-name preview
+   - Note: if password has any special characters, then escape with back slash: ./VmBackup.py vm-name
 7. Follow some VmBackup usage examples in the next section and try some examples with your VMs. Initially use the `preview` option, followed by a non-preview execution to actually see the VM export process. If you have a test XenServer environment, then utilize this for test verification.
 8. VM Recovery testing is an important part of the setup, see later section. Become familiar with the /snapshots/BACKUPS/vm-name directory structure and file contents, also in later section. After backing up some VMs then restore them on a test system and verify VM functionality.
 9. Plan your backup strategy, such as weekly, bi-monthly, monthly frequencies. How many copies of each backup do you want to keep? How long do your backup configurations take to execute and does this fit in with your XenServer processing priorities?
@@ -87,7 +88,7 @@ These new features have been added:
 	./VmBackup.py
 	
 	Usage:
-	./VmBackup.py  <password> <config-file|vm-selector> [preview] [other optional params]
+	./VmBackup.py <config-file|vm-selector> [preview] [other optional params]
 	
 	Also: VmBackup.py help    - for additional parameter usage
 	  or: VmBackup.py config  - for config-file parameter usage
@@ -99,10 +100,10 @@ These new features have been added:
 	./VmBackup.py help
   
 	Usage-help:
-	./VmBackup.py  <password|password-file> <config-file|vm-selector> [preview] [other optional params]
+	./VmBackup.py  <password-file> <config-file|vm-selector> [preview] [other optional params]
 
 	required params:
-  		<password|password-file> - xenserver password or obscured password stored in password-file
+  		<password-file> - xenserver password stored in password-file
   		<config-file|vm-selector> - several options:
     		config-file - a common choice for production crontab execution
     		vm-selector - a single vm name or vm prefix wildcard that defaults to vm-export
@@ -116,7 +117,7 @@ These new features have been added:
   		[ignore_extra_keys=True|False] - some config files may have extra params (default: False)
 
 	alternate form - create-password-file:
-	./VmBackup.py  <password> create-password-file=filename
+	./VmBackup.py create-password-file=filename
 
   		create-password-file=filename - create an obscured password file with the specified password
   		note - password filename is relative to current path or absolute path.
@@ -134,13 +135,13 @@ These new features have been added:
 	#### note - if any of these are not specified ####
 	####   then VmBackup uses default constants   ####
 
-	# Take Xen Pool DB backup: 0=No, 1=Yes (script default to 0=No)
+	# Take Xen Pool DB backup: 0=No, 1=Yes (default to 0=No):
 	pool_db_backup=0
 
-	# How many backups to keep for each vm (script default to 4)
+	# How many backups to keep for each vm (default to 4)
 	max_backups=3
 
-	#Backup Directory path (script default /snapshots/BACKUPS)
+	#Backup Directory path (required)
 	backup_dir=/path/to/backupspace
 
 	# applicable if vdi-export is used
@@ -150,9 +151,12 @@ These new features have been added:
 	#### specific VMs backup settings ####
 
 	# vm-export VM name-label of vm to backup. One per line - notice :max_backups override.
+
+	```
 	vm-export=my-vm-name
 	vm-export=my-second-vm
 	vm-export=my-third-vm:3
+	```
 
 	# special vdi-export - only backs up first disk. See README Documenation!
 	vdi-export=my-vm-name
@@ -163,7 +167,13 @@ These new features have been added:
 
 	# exclude selected VMs from VM prefix wildcards
 	exclude=PROD-WinDomainController
-	exclude=DEV-DestructiveTest 
+	exclude=DEV-DestructiveTest
+
+	# password to connect to the XenAPI (required)
+	password=sup3rs3cr37
+
+	# location of the logfile (default `/var/log/NAUbackup.log`)
+	status_log=/path/to/file.log
 
 #### Some simple examples:
 
@@ -172,26 +182,26 @@ These new features have been added:
 	Usage-examples:
 
 	# config file
-	./VmBackup.py password weekend.cfg
+	./VmBackup.py weekend.cfg
 
 	# single VM name, which is case sensitive
-	./VmBackup.py password DEV-mySql
+	./VmBackup.py DEV-mySql
 
 	# single VM name using vdi-export instead of vm-export
-	./VmBackup.py password vdi-export=DEV-mySql
+	./VmBackup.py vdi-export=DEV-mySql
 
 	# single VM name with spaces in name
-	./VmBackup.py password "DEV mySql"
+	./VmBackup.py "DEV mySql"
 
 	# VM prefix wildcard - which may be more than one VM
-	./VmBackup.py password DEV-my*
+	./VmBackup.py DEV-my*
 
 	# all VMs in pool
-	./VmBackup.py password "*"
+	./VmBackup.py "*"
 	
 	Alternate form - create-password-file:
 	# create password file from command line password
-	./VmBackup.py password create-password-file=/root/VmBackup.pass
+	./VmBackup.py create-password-file=/root/VmBackup.pass
 
 	# use password file + config file
 	./VmBackup.py /root/VmBackup.pass monthly.cfg
@@ -202,7 +212,7 @@ These new features have been added:
  
 **Example with errors present:**
 
-	./VmBackup.py password DEV-mySql preview
+	./VmBackup.py DEV-mySql preview
 	
 	2016-01-29-(10:33:49) - VmBackup.py running with these settings:
 	2016-01-29-(10:33:49) -   backup_dir        = /snapshots/BACKUPS
@@ -220,7 +230,7 @@ These new features have been added:
 
 **Example with errors resolved:**
 
-	./VmBackup.py password "DEV mySql" preview
+	./VmBackup.py "DEV mySql" preview
 	
 	2016-01-29-(10:33:49) - VmBackup.py running with these settings:
 	2016-01-29-(10:33:49) -   backup_dir        = /snapshots/BACKUPS
@@ -254,7 +264,7 @@ Notice the besides preview error checking, the VM list scope is also shown.
 	vm-export=DEV-RH*:3
 	exclude=PROD-ubuntu12.benchmark
 
-	./VmBackup.py password weekend.cfg preview
+	./VmBackup.py weekend.cfg preview
 	
 	2016-01-29-(10:58:59) - VmBackup.py running with these settings:
 	2016-01-29-(10:58:59) -   backup_dir        = /snapshots/BACKUPS
@@ -284,7 +294,7 @@ Notice the besides preview error checking, the VM list scope is also shown.
 	vm-export=DEV-RH*:3
 	exclude=PROD-ubuntu12-benchmark
 
-	./VmBackup.py password weekend.cfg preview
+	./VmBackup.py  weekend.cfg preview
 	
 	2016-01-29-(11:02:17) - VmBackup.py running with these settings:
 	2016-01-29-(11:02:17) -   backup_dir        = /snapshots/BACKUPS
@@ -305,8 +315,8 @@ Notice the besides preview error checking, the VM list scope is also shown.
 
 Typically you will want to run the cron with an input config file and redirected output file in case any run time errors occur.
 
-	10 0 * * 6 /usr/bin/python /snapshots/NAUbackup/VmBackup.py password \
-	/snapshots/NAUbackup/example.cfg >> /snapshots/NAUbackup/logs/VmBackup.log 2>&1
+	10 0 * * 6 /usr/bin/python /snapshots/NAUbackup/VmBackup.py /snapshots/NAUbackup/example.cfg >> \
+	/snapshots/NAUbackup/logs/VmBackup.log 2>&1
 
 
 ### VM selection and max_backups operations
