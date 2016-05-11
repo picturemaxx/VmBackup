@@ -573,7 +573,7 @@ def gather_vm_meta(vm_object, tmp_full_backup_dir):
     log ('Writing vm config file.')
     vm_out = open ('%s/vm.cfg' % tmp_full_backup_dir, 'w')
     vm_out.write('name_label=%s\n' % vm_record['name_label'])
-    vm_out.write('name_description=%s\n' % vm_record['name_description'])
+    vm_out.write('name_description=%s\n' % vm_record['name_description'].encode('utf-8'))
     vm_out.write('memory_dynamic_max=%s\n' % vm_record['memory_dynamic_max'])
     vm_out.write('VCPUs_max=%s\n' % vm_record['VCPUs_max'])
     vm_out.write('VCPUs_at_startup=%s\n' % vm_record['VCPUs_at_startup'])
@@ -630,7 +630,7 @@ def gather_vm_meta(vm_object, tmp_full_backup_dir):
         # now write out the vdi info.
         vdi_out = open('%s/vdi.cfg' % device_path, 'w')
         vdi_out.write('name_label=%s\n' % vdi_record['name_label'])
-        vdi_out.write('name_description=%s\n' % vdi_record['name_description'])
+        vdi_out.write('name_description=%s\n' % vdi_record['name_description'].encode('utf-8'))
         vdi_out.write('virtual_size=%s\n' % vdi_record['virtual_size'])
         vdi_out.write('type=%s\n' % vdi_record['type'])
         vdi_out.write('sharable=%s\n' % vdi_record['sharable'])
