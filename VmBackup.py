@@ -117,6 +117,7 @@ def main(session):
             # next vm
             continue
 
+        vm_record = session.xenapi.VM.get_record(vm_object)
         # check for custom field "retain"
         if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
             vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
@@ -294,10 +295,6 @@ def main(session):
             error_cnt += 1
             # next vm
             continue
-
-        # check for custom field "retain"
-        if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
-            vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
 
         vm_backup_dir = os.path.join(config['backup_dir'], vm_name)
         # cleanup any old unsuccessful backups and create new full_backup_dir
@@ -1313,14 +1310,6 @@ if __name__ == '__main__':
         usage()
         sys.exit(1)
     cfg_file = sys.argv[1]
-    # obscure password support
-    if (os.path.exists(password)): 
-        password = base64.b64decode(open(password, 'r').read())
-    if cfg_file.lower().startswith('create-password-file'):
-        array = sys.argv[2].strip().split('=')
-        open(array[1], 'w').write(base64.b64encode(password))
-        print 'password file saved to: %s' % array[1]
-        sys.exit(0)
 
     # load optional params
     preview = False                 # default
@@ -1395,22 +1384,31 @@ if __name__ == '__main__':
         log('ERROR in configuration settings...')
         sys.exit(1)
 
-    if 'password' in config:
-        password = config['password']
-    else:
-       if 'password_from_file' in config:
-            infile = open(config['password_from_file'], 'r')
-            password = infile.readline().strip()
-            infile.close()
-       else:
-            print 'ERROR in configuration: No password provided'
-            sys.exit(1)
-
     status_log = config['status_log']
 
     if len(config['vm-export']) == 0 and len(config['vdi-export']) == 0 :
         log('ERROR no VMs loaded')
         sys.exit(1)
+
+    # obscure password support
+    if 'password' in config:
+        password = config['password']
+    else:
+        if 'password_from_file' in config:
+            infile = open(config['password_from_file'], 'r')
+            password = infile.readline().strip()
+            infile.close()
+        else:
+            print 'ERROR in configuration: No password provided'
+            sys.exit(1)
+
+    if (os.path.exists(password)):
+        password = base64.b64decode(open(password, 'r').read())
+    if cfg_file.lower().startswith('create-password-file'):
+        array = sys.argv[2].strip().split('=')
+        open(array[1], 'w').write(base64.b64encode(password))
+        print 'password file saved to: %s' % array[1]
+        sys.exit(0)
 
     # acquire a xapi session by logging in
     try:
@@ -1430,7 +1428,7 @@ if __name__ == '__main__':
 
     if backup_running_vms:
         if config['pool_host']:
-        vms = session.xenapi.VM.get_all()		 +            # get running VMs for given host in XenPool
+        # get running VMs for given host in XenPool
             host = session.xenapi.host.get_by_name_label(config['pool_host'])
 
             if len(host) > 1:
