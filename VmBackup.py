@@ -1143,7 +1143,7 @@ def config_print():
 
     log('  vm-export (cnt)= %s' % len(config['vm-export']))
     str = ''
-    print type(config['vm-export'])
+
     for vm_parm in config['vm-export']:
         str += '%s, ' % vm_parm
     if len(str) > 1:
