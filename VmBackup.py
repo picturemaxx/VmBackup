@@ -68,15 +68,15 @@ expected_keys = ['pool_db_backup', 'max_backups', 'backup_dir', 'vdi_export_form
 message = ''
 xe_path = '/opt/xensource/bin' 
 
-def main(session): 
+def main(session):
 
     success_cnt = 0
     warning_cnt = 0
-    error_cnt = 0 
+    error_cnt = 0
 
     #setting autoflush on (aka unbuffered)
     sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-    
+
     server_name = os.uname()[1].split('.')[0]
     if config_specified:
         status_log_begin(server_name)
@@ -88,182 +88,187 @@ def main(session):
     if int(config['pool_db_backup']):
         log('*** begin backup_pool_metadata ***')
         if not backup_pool_metadata(server_name):
-            error_cnt += 1 
+            error_cnt += 1
 
-    ######################################################################
+            ######################################################################
     # Iterate through all vdi-export= in cfg
     log('************ vdi-export= ***************')
-    for vm_parm in config['vdi-export']:
-        log('*** vdi-export begin %s' % vm_parm)
-        beginTime = datetime.datetime.now()
-        this_status = 'success'
+    if not vdi_export_available:
+        vm_names = [get_vm_name(vm_parm) for vm_parm in config['vdi-export']]
+        log('Error XenVersion lower than 6.5, no vdi-export available. Skipping %s' % (vm_names))
 
-        # get values from vdi-export=
-        vm_name = get_vm_name(vm_parm)
-        vm_max_backups = get_vm_max_backups(vm_parm)
-        log('vdi-export - vm_name: %s max_backups: %s' % (vm_name, vm_max_backups))
+    else:
+        for vm_parm in config['vdi-export']:
+            log('*** vdi-export begin %s' % vm_parm)
+            beginTime = datetime.datetime.now()
+            this_status = 'success'
 
-        if config_specified:
-            status_log_vdi_export_begin(server_name, '%s' % vm_name)
+            # get values from vdi-export=
+            vm_name = get_vm_name(vm_parm)
+            vm_max_backups = get_vm_max_backups(vm_parm)
+            log('vdi-export - vm_name: %s max_backups: %s' % (vm_name, vm_max_backups))
 
-        # verify vm_name exists with only one instance for this name
-        #  returns error-message or vm_object if success
-        vm_object = verify_vm_name(vm_name)
-        if 'ERROR' in vm_object:
-            log('verify_vm_name: %s' % vm_object)
             if config_specified:
-                status_log_vdi_export_end(server_name, 'ERROR verify_vm_name %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
+                status_log_vdi_export_begin(server_name, '%s' % vm_name)
 
-        vm_record = session.xenapi.VM.get_record(vm_object)
-        # check for custom field "retain"
-        if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
-            vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
+            # verify vm_name exists with only one instance for this name
+            #  returns error-message or vm_object if success
+            vm_object = verify_vm_name(vm_name)
+            if 'ERROR' in vm_object:
+                log('verify_vm_name: %s' % vm_object)
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'ERROR verify_vm_name %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
 
-        vm_backup_dir = os.path.join(config['backup_dir'], vm_name) 
-        # cleanup any old unsuccessful backups and create new full_backup_dir
-        full_backup_dir = process_backup_dir(vm_backup_dir)
+            vm_record = session.xenapi.VM.get_record(vm_object)
+            # check for custom field "retain"
+            if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
+                vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
 
-        # gather_vm_meta produces status: empty or warning-message 
-        #   and globals: vm_uuid, xvda_uuid, xvda_uuid
-        vm_meta_status = gather_vm_meta(vm_object, full_backup_dir)
-        if vm_meta_status != '':
-            log('WARNING gather_vm_meta: %s' % vm_meta_status)
-            this_status = 'warning'
-            # non-fatal - finsh processing for this vm
-        # vdi-export only uses xvda_uuid, xvda_uuid
-        if xvda_uuid == '':
-            log('ERROR gather_vm_meta has no xvda-uuid')
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'ERROR xvda-uuid not found %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
-        if xvda_name_label == '':
-            log('ERROR gather_vm_meta has no xvda-name-label')
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'ERROR xvda-name-label not found %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
+            vm_backup_dir = os.path.join(config['backup_dir'], vm_name)
+            # cleanup any old unsuccessful backups and create new full_backup_dir
+            full_backup_dir = process_backup_dir(vm_backup_dir)
 
-        # -----------------------------------------
-        # --- begin vdi-export command sequence ---
-        log ('*** vdi-export begin xe command sequence')
-        # is vm currently running?
-        cmd = '%s/xe vm-list name-label=%s params=power-state | /bin/grep running' % (xe_path, vm_name)
-        if run_log_out_wait_rc(cmd) == 0:
-            log ('vm is running')
-        else:
-            log ('vm is NOT running')
+            # gather_vm_meta produces status: empty or warning-message
+            #   and globals: vm_uuid, xvda_uuid, xvda_uuid
+            vm_meta_status = gather_vm_meta(vm_object, full_backup_dir)
+            if vm_meta_status != '':
+                log('WARNING gather_vm_meta: %s' % vm_meta_status)
+                this_status = 'warning'
+                # non-fatal - finsh processing for this vm
+            # vdi-export only uses xvda_uuid, xvda_uuid
+            if xvda_uuid == '':
+                log('ERROR gather_vm_meta has no xvda-uuid')
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'ERROR xvda-uuid not found %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
+            if xvda_name_label == '':
+                log('ERROR gather_vm_meta has no xvda-name-label')
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'ERROR xvda-name-label not found %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
 
-        # list the vdi we will backup
-        cmd = '%s/xe vdi-list uuid=%s' % (xe_path, xvda_uuid)
-        log('1.cmd: %s' % cmd)
-        if run_log_out_wait_rc(cmd) != 0:
-            log('ERROR %s' % cmd)
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'VDI-LIST-FAIL %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
+            # -----------------------------------------
+            # --- begin vdi-export command sequence ---
+            log ('*** vdi-export begin xe command sequence')
+            # is vm currently running?
+            cmd = '%s/xe vm-list name-label=%s params=power-state | /bin/grep running' % (xe_path, vm_name)
+            if run_log_out_wait_rc(cmd) == 0:
+                log ('vm is running')
+            else:
+                log ('vm is NOT running')
 
-        # check for old vdi-snapshot for this xvda
-        snap_vdi_name_label = 'SNAP_%s_%s' % (vm_name, xvda_name_label)
-        # replace all spaces with '-'
-        snap_vdi_name_label = re.sub(r' ', r'-', snap_vdi_name_label)
-        log ('check for prev-vdi-snapshot: %s' % snap_vdi_name_label)
-        cmd = "%s/xe vdi-list name-label='%s' params=uuid | /bin/awk -F': ' '{print $2}' | /bin/grep '-'" % (xe_path, snap_vdi_name_label)
-        old_snap_vdi_uuid = run_get_lastline(cmd)
-        if old_snap_vdi_uuid != '':
-            log ('cleanup old-snap-vdi-uuid: %s' % old_snap_vdi_uuid)
-            # vdi-destroy old vdi-snapshot
-            cmd = '%s/xe vdi-destroy uuid=%s' % (xe_path, old_snap_vdi_uuid)
-            log('cmd: %s' % cmd)
+            # list the vdi we will backup
+            cmd = '%s/xe vdi-list uuid=%s' % (xe_path, xvda_uuid)
+            log('1.cmd: %s' % cmd)
+            if run_log_out_wait_rc(cmd) != 0:
+                log('ERROR %s' % cmd)
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'VDI-LIST-FAIL %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
+
+            # check for old vdi-snapshot for this xvda
+            snap_vdi_name_label = 'SNAP_%s_%s' % (vm_name, xvda_name_label)
+            # replace all spaces with '-'
+            snap_vdi_name_label = re.sub(r' ', r'-', snap_vdi_name_label)
+            log ('check for prev-vdi-snapshot: %s' % snap_vdi_name_label)
+            cmd = "%s/xe vdi-list name-label='%s' params=uuid | /bin/awk -F': ' '{print $2}' | /bin/grep '-'" % (xe_path, snap_vdi_name_label)
+            old_snap_vdi_uuid = run_get_lastline(cmd)
+            if old_snap_vdi_uuid != '':
+                log ('cleanup old-snap-vdi-uuid: %s' % old_snap_vdi_uuid)
+                # vdi-destroy old vdi-snapshot
+                cmd = '%s/xe vdi-destroy uuid=%s' % (xe_path, old_snap_vdi_uuid)
+                log('cmd: %s' % cmd)
+                if run_log_out_wait_rc(cmd) != 0:
+                    log('WARNING %s' % cmd)
+                    this_status = 'warning'
+                    # non-fatal - finsh processing for this vm
+
+            # take a vdi-snapshot of this vm
+            cmd = '%s/xe vdi-snapshot uuid=%s' % (xe_path, xvda_uuid)
+            log('2.cmd: %s' % cmd)
+            snap_vdi_uuid = run_get_lastline(cmd)
+            log ('snap-uuid: %s' % snap_vdi_uuid)
+            if snap_vdi_uuid == '':
+                log('ERROR %s' % cmd)
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'VDI-SNAPSHOT-FAIL %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
+
+            # change vdi-snapshot to unique name-label for easy id and cleanup
+            cmd = '%s/xe vdi-param-set uuid=%s name-label="%s"' % (xe_path, snap_vdi_uuid, snap_vdi_name_label)
+            log('3.cmd: %s' % cmd)
+            if run_log_out_wait_rc(cmd) != 0:
+                log('ERROR %s' % cmd)
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'VDI-PARAM-SET-FAIL %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
+
+            # actual-backup: vdi-export vdi-snapshot
+            cmd = '%s/xe vdi-export format=%s uuid=%s' % (xe_path, config['vdi_export_format'], snap_vdi_uuid)
+            full_path_backup_file = os.path.join(full_backup_dir, vm_name + '.%s' % config['vdi_export_format'])
+            cmd = '%s filename="%s"' % (cmd, full_path_backup_file)
+            log('4.cmd: %s' % cmd)
+            if run_log_out_wait_rc(cmd) == 0:
+                log('vdi-export success')
+            else:
+                log('ERROR %s' % cmd)
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'VDI-EXPORT-FAIL %s' % vm_name)
+                error_cnt += 1
+                # next vm
+                continue
+
+            # cleanup: vdi-destroy vdi-snapshot
+            cmd = '%s/xe vdi-destroy uuid=%s' % (xe_path, snap_vdi_uuid)
+            log('5.cmd: %s' % cmd)
             if run_log_out_wait_rc(cmd) != 0:
                 log('WARNING %s' % cmd)
                 this_status = 'warning'
                 # non-fatal - finsh processing for this vm
 
-        # take a vdi-snapshot of this vm
-        cmd = '%s/xe vdi-snapshot uuid=%s' % (xe_path, xvda_uuid)
-        log('2.cmd: %s' % cmd)
-        snap_vdi_uuid = run_get_lastline(cmd)
-        log ('snap-uuid: %s' % snap_vdi_uuid)
-        if snap_vdi_uuid == '':
-            log('ERROR %s' % cmd)
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'VDI-SNAPSHOT-FAIL %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
+            log ('*** vdi-export end')
+            # --- end vdi-export command sequence ---
+            # ---------------------------------------
 
-        # change vdi-snapshot to unique name-label for easy id and cleanup
-        cmd = '%s/xe vdi-param-set uuid=%s name-label="%s"' % (xe_path, snap_vdi_uuid, snap_vdi_name_label)
-        log('3.cmd: %s' % cmd)
-        if run_log_out_wait_rc(cmd) != 0:
-            log('ERROR %s' % cmd)
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'VDI-PARAM-SET-FAIL %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
+            elapseTime = datetime.datetime.now() - beginTime
+            backup_file_size = os.path.getsize(full_path_backup_file) / (1024 * 1024 * 1024)
+            final_cleanup( full_path_backup_file, backup_file_size, full_backup_dir, vm_backup_dir, vm_max_backups)
 
-        # actual-backup: vdi-export vdi-snapshot
-        cmd = '%s/xe vdi-export format=%s uuid=%s' % (xe_path, config['vdi_export_format'], snap_vdi_uuid)
-        full_path_backup_file = os.path.join(full_backup_dir, vm_name + '.%s' % config['vdi_export_format'])
-        cmd = '%s filename="%s"' % (cmd, full_path_backup_file) 
-        log('4.cmd: %s' % cmd)
-        if run_log_out_wait_rc(cmd) == 0:
-            log('vdi-export success')
-        else:
-            log('ERROR %s' % cmd)
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'VDI-EXPORT-FAIL %s' % vm_name)
-            error_cnt += 1
-            # next vm
-            continue
-    
-        # cleanup: vdi-destroy vdi-snapshot
-        cmd = '%s/xe vdi-destroy uuid=%s' % (xe_path, snap_vdi_uuid)
-        log('5.cmd: %s' % cmd)
-        if run_log_out_wait_rc(cmd) != 0:
-            log('WARNING %s' % cmd)
-            this_status = 'warning'
-            # non-fatal - finsh processing for this vm
+            if not check_all_backups_success(vm_backup_dir):
+                log('WARNING cleanup needed - not all backup history is successful')
+                this_status = 'warning'
 
-        log ('*** vdi-export end')
-        # --- end vdi-export command sequence ---
-        # ---------------------------------------
+            if (this_status == 'success'):
+                success_cnt += 1
+                log('VmBackup vdi-export %s - ***Success*** t:%s' % (vm_name, str(elapseTime.seconds/60)))
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'SUCCESS %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
 
-        elapseTime = datetime.datetime.now() - beginTime
-        backup_file_size = os.path.getsize(full_path_backup_file) / (1024 * 1024 * 1024)
-        final_cleanup( full_path_backup_file, backup_file_size, full_backup_dir, vm_backup_dir, vm_max_backups)
+            elif (this_status == 'warning'):
+                warning_cnt += 1
+                log('VmBackup vdi-export %s - ***WARNING*** t:%s' % (vm_name, str(elapseTime.seconds/60)))
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'WARNING %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
 
-        if not check_all_backups_success(vm_backup_dir):
-            log('WARNING cleanup needed - not all backup history is successful')
-            this_status = 'warning'
-
-        if (this_status == 'success'):
-            success_cnt += 1
-            log('VmBackup vdi-export %s - ***Success*** t:%s' % (vm_name, str(elapseTime.seconds/60)))
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'SUCCESS %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
-
-        elif (this_status == 'warning'):
-            warning_cnt += 1
-            log('VmBackup vdi-export %s - ***WARNING*** t:%s' % (vm_name, str(elapseTime.seconds/60)))
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'WARNING %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
-
-        else:
-            # this should never occur since all errors do a continue on to the next vm_name
-            error_cnt += 1
-            log('VmBackup vdi-export %s - +++ERROR-INTERNAL+++ t:%s' % (vm_name, str(elapseTime.seconds/60)))
-            if config_specified:
-                status_log_vdi_export_end(server_name, 'ERROR-INTERNAL %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
+            else:
+                # this should never occur since all errors do a continue on to the next vm_name
+                error_cnt += 1
+                log('VmBackup vdi-export %s - +++ERROR-INTERNAL+++ t:%s' % (vm_name, str(elapseTime.seconds/60)))
+                if config_specified:
+                    status_log_vdi_export_end(server_name, 'ERROR-INTERNAL %s,elapse:%s size:%sG' % (vm_name, str(elapseTime.seconds/60), backup_file_size))
 
     # end of for vm_parm in config['vdi-export']:
     ######################################################################
@@ -367,11 +372,8 @@ def main(session):
             # next vm
             continue
 
-        cmd = 'cat /etc/redhat-release | cut -d" " -f3 | cut -d. -f1-2'
-        xen_version = run_get_lastline(cmd)
         vdi_cf = get_custom_field(vm_object, 'vdi_backup')
-        if vdi_cf is not None and vdi_cf.lower() == 'true' and \
-                StrictVersion(xen_version) >= StrictVersion("6.5"):
+        if vdi_cf is not None and vdi_cf.lower() == 'true' and vdi_export_available:
 
             # vdi-export of vm-snapshot
 
@@ -498,8 +500,8 @@ def main(session):
             #open('%s' % status_log, 'w').close() # trunc status log after email
         log('VmBackup ended - Success - %s' % summary)
 
-    # done with main()
-    ######################################################################
+        # done with main()
+        ######################################################################
 def isInt(s):
     try:
         int(s)
@@ -1141,6 +1143,7 @@ def config_print():
 
     log('  vm-export (cnt)= %s' % len(config['vm-export']))
     str = ''
+    print type(config['vm-export'])
     for vm_parm in config['vm-export']:
         str += '%s, ' % vm_parm
     if len(str) > 1:
@@ -1445,7 +1448,6 @@ if __name__ == '__main__':
             # get running VMs directly from current XenServer
             vms = session.xenapi.VM.get_all()
 
-
         if (len(vms) == 0):
              print 'ERROR - no runnings VMs found'
              sys.exit(1)
@@ -1456,6 +1458,11 @@ if __name__ == '__main__':
                  config['vm-export'].append(record['name_label'])
 
     config_print()     # show fully loaded config
+
+    vdi_export_available = True
+    xen_version = session.xenapi.host.get_record(hosts[0])["software_version"]["product_version_text_short"]
+    if StrictVersion(xen_version) < StrictVersion("6.5"):
+        vdi_export_available = False
 
     if not verify_config_vms_exist():
         # error message(s) printed in verify_config_vms_exist
