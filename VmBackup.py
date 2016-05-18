@@ -1397,21 +1397,8 @@ if __name__ == '__main__':
     if 'password' in config:
         password = config['password']
     else:
-        if 'password_from_file' in config:
-            infile = open(config['password_from_file'], 'r')
-            password = infile.readline().strip()
-            infile.close()
-        else:
-            print 'ERROR in configuration: No password provided'
-            sys.exit(1)
-
-    if (os.path.exists(password)):
-        password = base64.b64decode(open(password, 'r').read())
-    if cfg_file.lower().startswith('create-password-file'):
-        array = sys.argv[2].strip().split('=')
-        open(array[1], 'w').write(base64.b64encode(password))
-        print 'password file saved to: %s' % array[1]
-        sys.exit(0)
+        print 'ERROR in configuration: No password provided'
+        sys.exit(1)
 
     # acquire a xapi session by logging in
     try:
