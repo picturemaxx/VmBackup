@@ -158,7 +158,7 @@ def main(session):
             # --- begin vdi-export command sequence ---
             log ('*** vdi-export begin xe command sequence')
             # is vm currently running?
-            cmd = '%s/xe vm-list name-label=%s params=power-state | /bin/grep running' % (xe_path, vm_name)
+            cmd = '%s/xe vm-list name-label="%s" params=power-state | /bin/grep running' % (xe_path, vm_name)
             if run_log_out_wait_rc(cmd) == 0:
                 log ('vm is running')
             else:
@@ -325,7 +325,7 @@ def main(session):
         # --- begin vm-export command sequence ---
         log ('*** vm-export begin xe command sequence')
         # is vm currently running?
-        cmd = '%s/xe vm-list name-label=%s params=power-state | /bin/grep running' % (xe_path, vm_name)
+        cmd = '%s/xe vm-list name-label="%s" params=power-state | /bin/grep running' % (xe_path, vm_name)
         if run_log_out_wait_rc(cmd) == 0:
             log ('vm is running')
         else:
@@ -1143,7 +1143,7 @@ def config_print():
 
     log('  vm-export (cnt)= %s' % len(config['vm-export']))
     str = ''
-    print type(config['vm-export'])
+
     for vm_parm in config['vm-export']:
         str += '%s, ' % vm_parm
     if len(str) > 1:
