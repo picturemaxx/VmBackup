@@ -126,8 +126,12 @@ def main(session):
             # check for custom field "retain"
             if 'XenCenter.CustomFields.retain' in vm_record['other_config'].keys():
                 vm_max_backups = int(vm_record['other_config']['XenCenter.CustomFields.retain'])
-
-            vm_backup_dir = os.path.join(config['backup_dir'], vm_name)
+        # check for custom field "backup_dir"
+            if 'XenCenter.CustomFields.backup_dir' in vm_record['other_config'].keys():
+                vm_backup_dir = vm_record['other_config']['XenCenter.CustomFields.backup_dir']
+            else:
+                vm_backup_dir = config['vm_backup_dir']
+            vm_backup_dir = os.path.join(vm_backup_dir, vm_name)
             # cleanup any old unsuccessful backups and create new full_backup_dir
             full_backup_dir = process_backup_dir(vm_backup_dir)
 
