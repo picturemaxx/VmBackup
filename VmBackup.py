@@ -1422,7 +1422,7 @@ if __name__ == '__main__':
 
     if backup_running_vms:
         if config['pool_host']:
-        # get running VMs for given host in XenPool
+            # get running VMs for given host in XenPool
             host = session.xenapi.host.get_by_name_label(config['pool_host'])
 
             if len(host) > 1:
