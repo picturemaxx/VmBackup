@@ -130,7 +130,7 @@ def main(session):
             if 'XenCenter.CustomFields.backup_dir' in vm_record['other_config'].keys():
                 vm_backup_dir = vm_record['other_config']['XenCenter.CustomFields.backup_dir']
             else:
-                vm_backup_dir = config['vm_backup_dir']
+                vm_backup_dir = config['backup_dir']
             vm_backup_dir = os.path.join(vm_backup_dir, vm_name)
             # cleanup any old unsuccessful backups and create new full_backup_dir
             full_backup_dir = process_backup_dir(vm_backup_dir)
@@ -1393,10 +1393,6 @@ if __name__ == '__main__':
 
     status_log = config['status_log']
 
-    if len(config['vm-export']) == 0 and len(config['vdi-export']) == 0 :
-        log('ERROR no VMs loaded')
-        sys.exit(1)
-
     # obscure password support
     if 'password' in config:
         password = config['password']
@@ -1447,6 +1443,10 @@ if __name__ == '__main__':
              record = session.xenapi.VM.get_record(vm)
              if not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
                  config['vm-export'].append(record['name_label'])
+
+    if len(config['vm-export']) == 0 and len(config['vdi-export']) == 0 :
+        log('ERROR no VMs loaded')
+        sys.exit(1)
 
     config_print()     # show fully loaded config
 
