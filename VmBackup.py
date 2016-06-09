@@ -376,8 +376,8 @@ def main(session):
             # next vm
             continue
 
-        vdi_cf = get_custom_field(vm_object, 'vdi_backup')
-        if vdi_cf is not None and vdi_cf.lower() == 'true' and vdi_export_available:
+        vm_backup_type = get_custom_field(vm_object, 'backup_type')
+        if vm_backup_type is not None and vm_backup_type.lower() == 'vdi' and vdi_export_available:
 
             # vdi-export of vm-snapshot
 
@@ -413,7 +413,7 @@ def main(session):
                     continue
 
         else:
-            if vdi_cf is not None and vdi_cf.lower() == 'true':
+            if vm_backup_type is not None and vm_backup_type.lower() == 'true':
                 log('WARNING XenVersion lower than 6.5, no vdi-export available, doing vm-export instead')
 
             # vm-export vm-snapshot
@@ -1441,7 +1441,11 @@ if __name__ == '__main__':
 
         for vm in vms:
              record = session.xenapi.VM.get_record(vm)
-             if not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
+             backup_type = get_custom_field(vm, 'backup_type')
+             if backup_type is not None and backup_type.lower() == 'vdi-first' \
+                 and not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
+                 config['vdi-export'].append(record['name_label'])
+             elif not(record["is_a_template"]) and not(record["is_control_domain"]) and (record["power_state"] == "Running"):
                  config['vm-export'].append(record['name_label'])
 
     if len(config['vm-export']) == 0 and len(config['vdi-export']) == 0 :
